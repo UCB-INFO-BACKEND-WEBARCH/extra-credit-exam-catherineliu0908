@@ -19,13 +19,30 @@ services:
       - "5000:5000"
     volumes:
       - pipeline_data:/data
-    # TODO: environment, depends_on, command
+    environment:
+      DATABASE_URL: postgresql://pipeline:pipeline@db:5432/pipeline
+      REDIS_URL: redis://redis:6379/0
+      FLASK_APP: app.py
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: flask run --host=0.0.0.0 --port=5000
 
   worker:
     build: .
     volumes:
       - pipeline_data:/data
-    # TODO: environment, depends_on, command
+    environment:
+      DATABASE_URL: postgresql://pipeline:pipeline@db:5432/pipeline
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: python worker.py
 
   db:
     image: postgres:15
@@ -33,11 +50,20 @@ services:
       POSTGRES_USER: pipeline
       POSTGRES_PASSWORD: pipeline
       POSTGRES_DB: pipeline
-    # TODO: healthcheck
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pipeline"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 
   redis:
     image: redis:7
-    # TODO: healthcheck
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 volumes:
   pipeline_data:
